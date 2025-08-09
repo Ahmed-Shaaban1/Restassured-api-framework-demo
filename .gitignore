@@ -1,0 +1,15 @@
+Maven
+Build artifacts
+/target/
+
+Eclipse IDE files
+.classpath
+.project
+.settings/
+
+
+Log files
+*.log
+
+Allure report generated locally
+/allure-report/

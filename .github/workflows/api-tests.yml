@@ -1,0 +1,115 @@
+# Set the name of the workflow. This will appear in the GitHub Actions UI.
+name: API Tests with Allure and Docker
+
+# Configure the events that trigger this workflow.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Allow one concurrent deployment.
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+# Define two jobs: one for running tests and one for publishing the report.
+jobs:
+  # This job will build the Docker image and run the tests to generate the Allure results.
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Maven Central mirror fallback
+        run: |
+          mkdir -p ~/.m2
+          echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+            <mirrors>
+              <mirror>
+                <id>central</id>
+                <mirrorOf>central</mirrorOf>
+                <url>https://repo1.maven.org/maven2</url>
+              </mirror>
+            </mirrors>
+          </settings>' > ~/.m2/settings.xml
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven
+
+      - name: Build Docker image and run tests
+        run: |
+         # Build the Docker image.
+         docker build -t api-tests .
+     
+         # Run the tests inside the container and get the Allure report files.
+         # The `mvn test` command runs the tests, and the `-DbaseUrl` argument passes the URL.
+         docker run --name api-tests-container api-tests mvn test -DbaseUrl=https://fakerestapi.azurewebsites.net
+         docker cp api-tests-container:/app/target/allure-results ./allure-results || echo "Report not found, tests may have failed."
+    
+      # This step saves the raw Allure results as a workflow artifact.
+      # The 'publish-report' job will download this artifact.
+      - name: Upload Allure results artifact
+        uses: actions/upload-artifact@v4.3.1
+        with:
+          name: allure-results
+          path: allure-results
+          retention-days: 7
+
+  # This job depends on the 'build-and-test' job and will publish the report to GitHub Pages.
+  publish-report:
+    # This job will only run after 'build-and-test' has successfully completed.
+    needs: build-and-test
+    runs-on: ubuntu-latest
+
+    # These permissions are required to publish to GitHub Pages.
+    # The 'pages: write' permission allows the action to create a deployment.
+    # The 'id-token: write' permission allows the action to fetch an ID token for deployment.
+    permissions:
+      pages: write
+      id-token: write
+
+    # The 'environment' key links this job to a specific deployment environment.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      # This action sets up the GitHub Pages environment.
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      # This step downloads the raw Allure results artifact from the 'build-and-test' job.
+      - name: Download Allure results artifact
+        uses: actions/download-artifact@v4.1.7
+        with:
+          name: allure-results
+          path: allure-results
+
+      # This action generates the Allure HTML report from the downloaded results.
+      - name: Generate Allure Report
+        uses: simple-elf/allure-report-action@v1.9
+        with:
+          allure_results: allure-results
+          allure_history: allure-history
+          gh_pages: gh-pages
+          subfolder: allure-report
+
+      # This action prepares the generated report for deployment.
+      # The `github-pages` artifact name is special and signals GitHub to use this for publishing.
+      - name: Upload Allure HTML report artifacts
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: allure-report
+
+      # This action deploys the uploaded artifact to your GitHub Pages site.
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
