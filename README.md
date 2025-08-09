@@ -33,12 +33,12 @@ This is an automated API testing framework built for the [FakeRestAPI](https://f
 
 ### 1. clone the project
 ```bash
-git clone https://github.com/Ahmed-Shaaban1/Rest-api-automation-demo
+git clone https://github.com/Ahmed-Shaaban1/Restassured-api-framework-demo
 ```
 
 ### 2. Run tests using Maven
 ```bash
-mvn clean test -DbaseUrl=https://fakerestapi.azurewebsites.net
+mvn clean test 
 ```
 
 ### 3. View Allure Report
@@ -73,7 +73,8 @@ project-root/
 ├── Dockerfile          # Docker runner
 ├── pom.xml             # Maven config
 ├── .github/workflows   # GitHub Actions pipeline
-└── README.md           # You are here :)
+├──regressionSuite.xml
+└──README.md          # You are here :)
 ```
 
 ---
@@ -96,4 +97,4 @@ Allure HTML report will be auto-generated under `target/allure-results`.
 
 ## 📄 License
 This is a demo project. Use freely for educational purposes.
-```"# Rest-api-automation-demo" 
+```"# Restassured-api-framework-demo" 
